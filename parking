@@ -1,0 +1,101 @@
+
+const int ledFree = 2;        
+const int ledOccupied = 3;    
+const int ledWarning = 4;     
+const int ultrasonicTrig = 9; 
+const int ultrasonicEcho = 10;
+
+long echoDuration;       
+int measuredDistance;    
+bool parkingOccupied = false; // Tracks whether a vehicle is present
+
+unsigned long arrivalTimestamp = 0;            
+const unsigned long maxParkingDuration = 10000; // 10 seconds threshold
+
+void setup() {
+  // Initialize serial communication for debugging
+  Serial.begin(9600);
+
+  // Configure ultrasonic sensor pins
+  pinMode(ultrasonicTrig, OUTPUT);
+  pinMode(ultrasonicEcho, INPUT);
+  
+  // Configure LED pins
+  pinMode(ledFree, OUTPUT);
+  pinMode(ledOccupied, OUTPUT);
+  pinMode(ledWarning, OUTPUT);
+}
+
+
+int readDistanceCM() {
+  // Ensure trigger pin starts LOW
+  digitalWrite(ultrasonicTrig, LOW);
+  delayMicroseconds(2);
+  
+  // Send 10µs HIGH pulse to trigger ultrasonic wave
+  digitalWrite(ultrasonicTrig, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(ultrasonicTrig, LOW);
+  
+  // Measure duration of echo signal
+  echoDuration = pulseIn(ultrasonicEcho, HIGH);
+  
+  // Convert time into distance (speed of sound formula)
+  measuredDistance = echoDuration * 0.034 / 2;
+  
+  return measuredDistance;
+}
+
+
+
+void loop() {
+  int currentDistance = readDistanceCM();
+  
+  // Output distance to Serial Monitor for debugging
+  Serial.print("Measured Distance: ");
+  Serial.print(currentDistance);
+  Serial.println(" cm");
+
+  
+  if (currentDistance > 100) {
+    digitalWrite(ledFree, HIGH);     
+    digitalWrite(ledOccupied, LOW);  
+    digitalWrite(ledWarning, LOW);  
+    
+    parkingOccupied = false;   
+    arrivalTimestamp = 0;   
+  }
+  
+
+  else {
+    // Detect the exact moment a vehicle arrives
+    if (!parkingOccupied) {
+      parkingOccupied = true;
+      arrivalTimestamp = millis(); // Record arrival time
+    }
+
+    // Indicate occupied state
+    digitalWrite(ledFree, LOW);
+    digitalWrite(ledOccupied, HIGH);
+
+    //how long the car has been parked
+    unsigned long parkedDuration = millis() - arrivalTimestamp;
+
+    if (parkedDuration >= maxParkingDuration) {
+      
+      // Blink warning LED every 500ms without blocking execution
+      if ((millis() / 500) % 2 == 0) {
+        digitalWrite(ledWarning, HIGH);
+      } else {
+        digitalWrite(ledWarning, LOW);
+      }
+      
+    } else {
+      // Within allowed time → no warning
+      digitalWrite(ledWarning, LOW);
+    }
+  }
+  
+  // Small delay to stabilize readings (especially in simulators)
+  delay(50);
+}
